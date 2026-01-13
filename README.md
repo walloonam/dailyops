@@ -1,56 +1,53 @@
-# DailyOps
+﻿# DailyOps
 
-Fullstack personal ops dashboard. Dev-only setup.
+풀스택 개인 운영 대시보드입니다. (개발 환경 기준)
 
-## Prerequisites
+## 사전 요구사항
 - Rust stable
 - Node.js 18+
 - pnpm
-- Postgres running locally
+- 로컬 Postgres
 
-Example Postgres (Docker optional, but not required):
-```
-# If you already have Postgres, skip this.
+Docker로 Postgres 예시(이미 있다면 생략):
+```bash
 docker run --name dailyops-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dailyops -p 5432:5432 -d postgres:16
 ```
 
-## Database setup
-```
+## 데이터베이스 설정
+```bash
 cd apps/api
 cp .env.example .env
-# edit DATABASE_URL if needed
+# 필요하면 DATABASE_URL 수정
 sqlx migrate run
 ```
 
-## Run backend
-```
+## 백엔드 실행
+```bash
 cd apps/api
 cargo run
 ```
+API 주소: http://localhost:8080
 
-API runs on http://localhost:8080
-
-### Local AI 비서 (Ollama)
-```
-# 로컬에서 모델 준비 (예: phi3.5:mini)
+### 로컬 AI(Ollama) 옵션
+```bash
+# 로컬에서 사용할 모델 다운로드 (예: phi3.5:mini)
 ollama pull phi3.5:mini
 ollama serve  # http://localhost:11434
 
-# apps/api/.env 에 설정 (기본값 그대로면 생략 가능)
+# apps/api/.env에 설정 (기본값 그대로면 수정 불필요)
 AI_BASE_URL=http://localhost:11434
 AI_MODEL=phi3.5:mini
 ```
-- 프런트에서 `/assistant` 페이지로 접속하면 로컬 Ollama를 통해 업무/노트 컨텍스트 기반 답변을 받습니다.
+- 위 설정 후 `/assistant` 엔드포인트 요청 시 로컬 Ollama를 통해 응답합니다.
 
-## Run frontend
-```
+## 프론트엔드 실행
+```bash
 cd apps/web
 pnpm i
 pnpm dev
 ```
+웹 주소: http://localhost:5173
 
-Web runs on http://localhost:5173
-
-## Notes
-- JWT stored in localStorage
-- Use the Signup page first
+## 참고
+- JWT가 localStorage에 저장됩니다.
+- 먼저 회원가입(Signup) 페이지에서 계정을 만든 뒤 사용하세요.
