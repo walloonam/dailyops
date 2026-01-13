@@ -1,0 +1,29 @@
+﻿# Environment
+.env
+.env.*
+!.env.example
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example
+apps/web/.env
+apps/web/.env.*
+!apps/web/.env.example
+
+# Node/Vite output
+node_modules/
+apps/web/node_modules/
+dist/
+apps/web/dist/
+apps/web/.vite/
+apps/web/.turbo/
+pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+
+# Rust build output
+target/
+apps/api/target/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
