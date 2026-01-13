@@ -48,6 +48,18 @@ pnpm dev
 ```
 웹 주소: http://localhost:5173
 
+## 배포 설정 예시(프런트·백 동일 서버)
+- 백엔드 서비스: 127.0.0.1:8080 등 내부 포트로 띄우고, Nginx 등 리버스 프록시가 `https://your-domain/api` → `http://127.0.0.1:8080`으로 전달.
+- 프런트 정적 파일: `https://your-domain`에서 서빙.
+- 브라우저가 볼 API 주소는 도메인 기준이어야 하므로 `.env`에 다음처럼 설정:
+  - `VITE_API_BASE_URL=https://your-domain/api`
+  - `VITE_MOCK=false`
+- 백엔드 `.env` 기본값 예시:
+  - `DATABASE_URL=postgres://<user>:<password>@127.0.0.1:5432/dailyops`
+  - `JWT_SECRET`는 강한 랜덤 문자열로 변경
+  - `PORT=8080` (필요 시 변경)
+  - `AI_BASE_URL`/`AI_MODEL`: 로컬 또는 외부 모델 엔드포인트에 맞게 설정
+
 ## 참고
 - JWT가 localStorage에 저장됩니다.
 - 먼저 회원가입(Signup) 페이지에서 계정을 만든 뒤 사용하세요.
