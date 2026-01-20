@@ -13,9 +13,9 @@ type ChatResponse = {
 };
 
 const QUICK_PROMPTS = [
-  "Today briefing",
-  "This week priority summary",
-  "Summarize notes",
+  "오늘 브리핑",
+  "이번 주 우선순위 정리",
+  "노트 요약",
   "업무 등록: 회의 준비 2024-12-01"
 ];
 
@@ -41,7 +41,7 @@ export default function Assistant() {
       loadHistory() || [
         {
           role: "assistant",
-          content: "Ask a question, request a briefing, or register a task."
+          content: "질문하거나 브리핑을 요청하거나 업무를 등록해 보세요."
         }
       ]
     );
@@ -59,7 +59,7 @@ export default function Assistant() {
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
     },
     onError: (err) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${String(err)}` }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: `에러: ${String(err)}` }]);
     }
   });
 
@@ -88,8 +88,8 @@ export default function Assistant() {
   const placeholder = useMemo(
     () =>
       isSending
-        ? "Generating..."
-        : "Try: Today briefing / 업무 등록: 회의 준비 2024-12-01",
+        ? "답변 생성 중..."
+        : "예: 오늘 브리핑 / 업무 등록: 회의 준비 2024-12-01",
     [isSending]
   );
 
@@ -97,9 +97,9 @@ export default function Assistant() {
     <div className="grid gap-6">
       <div className="card flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">AI Assistant</h1>
+          <h1 className="text-xl font-semibold">AI 비서</h1>
           <p className="text-sm text-slate-500">
-            Task registration and briefings based on your tasks and notes.
+            업무/노트를 기반으로 브리핑과 업무 등록을 도와줍니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -123,7 +123,7 @@ export default function Assistant() {
                     : "bg-gradient-to-r from-indigo-500 to-cyan-400 text-white ml-auto max-w-[80%]"
                 }`}
               >
-                <div className="text-xs opacity-70 mb-1">{m.role === "assistant" ? "Assistant" : "Me"}</div>
+                <div className="text-xs opacity-70 mb-1">{m.role === "assistant" ? "비서" : "나"}</div>
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
               </div>
             ))}
@@ -144,7 +144,7 @@ export default function Assistant() {
             disabled={isSending}
           />
           <button className="btn-primary" onClick={() => sendMessage()} disabled={isSending} type="button">
-            Send
+            보내기
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-use axum::{extract::State, response::IntoResponse, Json};
+﻿use axum::{extract::State, response::IntoResponse, Json};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -39,7 +39,7 @@ pub async fn chat(
 
     if !is_brief_request(&payload.message) {
         return Json(ChatResponse {
-            reply: "I can only help with task registration and briefing. Try: \"업무 등록: 회의 준비 2024-12-01\" or \"오늘 일정 브리핑\".".to_string(),
+            reply: "저는 업무 등록과 브리핑만 도와드려요. 예) \"업무 등록: 회의 준비 2024-12-01\" 또는 \"오늘 브리핑\"".to_string(),
         })
         .into_response();
     }
@@ -58,10 +58,9 @@ pub async fn chat(
             {
                 "role": "system",
                 "content": format!(
-                    "너는 사용자의 비서다. 한국어로 짧고 실용적으로 답해라. \
-                    오늘 할 일/우선순위/마감과 최근 노트를 참고해 요청에 맞게 정리하거나 답변해. \
-                    할 일은 bullet로 요약하고, 날짜가 없다면 '마감 없음'이라고 적어라. \
-                    컨텍스트: {}",
+                    "당신은 데일리 업무 비서입니다. 브리핑/요약만 처리합니다. \
+간결한 불릿 포인트로 답하세요. 마감일이 없으면 \"마감 없음\"이라고 표기하세요. \
+제공된 컨텍스트만 사용하세요.\n컨텍스트: {}",
                     context
                 )
             },
@@ -77,7 +76,7 @@ pub async fn chat(
             let parsed = res.json::<OllamaChatResponse>().await.ok();
             let reply = parsed
                 .and_then(|p| p.message.map(|m| m.content).or(p.response))
-                .unwrap_or_else(|| "모델 응답을 읽지 못했습니다.".to_string());
+                .unwrap_or_else(|| "모델 응답이 비어 있습니다.".to_string());
             Json(ChatResponse { reply }).into_response()
         }
         Ok(res) => {
@@ -85,13 +84,13 @@ pub async fn chat(
             let text = res.text().await.unwrap_or_default();
             (
                 axum::http::StatusCode::BAD_GATEWAY,
-                format!("모델 호출 실패({status}): {text}"),
+                format!("모델 호출 실패 ({status}): {text}"),
             )
                 .into_response()
         }
         Err(err) => (
             axum::http::StatusCode::BAD_GATEWAY,
-            format!("모델 서버에 연결할 수 없습니다: {err} (ollama serve 실행 여부 확인)"),
+            format!("모델 서버 오류: {err} (ollama 실행 여부 확인)"),
         )
             .into_response(),
     }
@@ -103,7 +102,9 @@ fn is_task_create_request(message: &str) -> bool {
         || msg.contains("업무 등록")
         || msg.contains("일정등록")
         || msg.contains("일정 등록")
+        || msg.contains("task")
         || msg.contains("add task")
+        || msg.contains("create task")
         || msg.starts_with("task:")
 }
 
@@ -113,8 +114,9 @@ fn is_brief_request(message: &str) -> bool {
         || msg.contains("요약")
         || msg.contains("정리")
         || msg.contains("우선순위")
-        || msg.contains("summary")
         || msg.contains("brief")
+        || msg.contains("summary")
+        || msg.contains("priorities")
 }
 
 async fn handle_task_create(
@@ -125,7 +127,7 @@ async fn handle_task_create(
     let (title, due_date) = extract_title_and_due(message);
     if title.is_empty() {
         return Json(ChatResponse {
-            reply: "Please provide a task title. Example: \"업무 등록: 회의 준비 2024-12-01\".".to_string(),
+            reply: "업무 제목을 알려주세요. 예) \"업무 등록: 회의 준비 2024-12-01\"".to_string(),
         })
         .into_response();
     }
@@ -153,15 +155,15 @@ async fn handle_task_create(
     match row {
         Ok(task) => Json(ChatResponse {
             reply: format!(
-                "Task created: {}{}",
+                "업무가 등록됐어요: {}{}",
                 task.title,
                 task.due_date
-                    .map(|d| format!(" (due {})", d))
+                    .map(|d| format!(" (마감 {})", d))
                     .unwrap_or_default()
             ),
         })
         .into_response(),
-        Err(_) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+        Err(_) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "db 오류").into_response(),
     }
 }
 
@@ -188,6 +190,7 @@ fn extract_title_and_due(message: &str) -> (String, Option<NaiveDate>) {
         .replace("등록", "")
         .replace("task:", "")
         .replace("add task", "")
+        .replace("create task", "")
         .trim()
         .to_string();
 
@@ -257,7 +260,7 @@ fn build_context(tasks: &[Task], notes: &[Note]) -> String {
         parts.push(format!("노트: {}", note_lines.join(" | ")));
     }
     if parts.is_empty() {
-        "현재 등록된 업무/노트가 없습니다.".to_string()
+        "등록된 업무나 노트가 없습니다.".to_string()
     } else {
         parts.join(" ; ")
     }
