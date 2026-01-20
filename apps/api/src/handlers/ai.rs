@@ -1,5 +1,5 @@
 ﻿use axum::{extract::State, response::IntoResponse, Json};
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -125,6 +125,7 @@ async fn handle_task_create(
     message: &str,
 ) -> axum::response::Response {
     let (title, start_date, end_date) = extract_title_and_range(message);
+    let due_date = end_date.or(start_date);
     if title.is_empty() {
         return Json(ChatResponse {
             reply: "업무 제목을 알려주세요. 예) \"업무 등록: 회의 준비 2024-12-01\"".to_string(),
@@ -146,7 +147,7 @@ async fn handle_task_create(
         Option::<String>::None,
         "todo",
         "medium",
-        end_date,
+        due_date,
         start_date,
         end_date,
         &empty_tags
@@ -168,23 +169,23 @@ async fn handle_task_create(
 }
 
 fn extract_title_and_range(message: &str) -> (String, Option<NaiveDate>, Option<NaiveDate>) {
-    let mut start_date = None;
-    let mut end_date = None;
+    let (keyword_start, keyword_end) = infer_range_from_keywords(message);
+    let mut start_date = keyword_start;
+    let mut end_date = keyword_end;
     let mut filtered: Vec<String> = Vec::new();
+
+    if message.contains('~') && start_date.is_none() && end_date.is_none() {
+        let parts: Vec<&str> = message.split('~').collect();
+        if parts.len() >= 2 {
+            start_date = extract_first_date(parts[0]);
+            end_date = extract_first_date(parts[1]);
+        }
+    }
 
     for token in message.split_whitespace() {
         let token_trim = token.trim();
         if token_trim.contains('~') {
-            let parts: Vec<&str> = token_trim.split('~').collect();
-            if parts.len() == 2 {
-                if let Ok(date) = NaiveDate::parse_from_str(parts[0], "%Y-%m-%d") {
-                    start_date = Some(date);
-                }
-                if let Ok(date) = NaiveDate::parse_from_str(parts[1], "%Y-%m-%d") {
-                    end_date = Some(date);
-                }
-                continue;
-            }
+            continue;
         }
 
         if start_date.is_none() {
@@ -214,14 +215,92 @@ fn extract_title_and_range(message: &str) -> (String, Option<NaiveDate>, Option<
         .replace("업무 등록", "")
         .replace("일정등록", "")
         .replace("일정 등록", "")
+        .replace("등록해줘요", "")
+        .replace("등록해줘", "")
+        .replace("추가해줘요", "")
+        .replace("추가해줘", "")
+        .replace("추가", "")
+        .replace("해줘요", "")
+        .replace("해줘", "")
         .replace("등록", "")
         .replace("task:", "")
         .replace("add task", "")
         .replace("create task", "")
+        .replace("오늘", "")
+        .replace("내일", "")
+        .replace("이번주", "")
+        .replace("다음주", "")
+        .replace("이번달", "")
+        .replace("다음달", "")
         .trim()
         .to_string();
 
     (cleaned, start_date, end_date)
+}
+
+fn extract_first_date(input: &str) -> Option<NaiveDate> {
+    for token in input.split_whitespace() {
+        if let Ok(date) = NaiveDate::parse_from_str(token.trim(), "%Y-%m-%d") {
+            return Some(date);
+        }
+    }
+    None
+}
+
+fn infer_range_from_keywords(message: &str) -> (Option<NaiveDate>, Option<NaiveDate>) {
+    let today = Utc::now().date_naive();
+    if message.contains("오늘") {
+        return (Some(today), Some(today));
+    }
+    if message.contains("내일") {
+        let next = today.succ_opt().unwrap_or(today);
+        return (Some(next), Some(next));
+    }
+    if message.contains("이번주") {
+        let weekday = today.weekday().num_days_from_monday() as i64;
+        let start = today - chrono::Duration::days(weekday);
+        let end = start + chrono::Duration::days(6);
+        return (Some(start), Some(end));
+    }
+    if message.contains("다음주") {
+        let weekday = today.weekday().num_days_from_monday() as i64;
+        let start = today - chrono::Duration::days(weekday) + chrono::Duration::days(7);
+        let end = start + chrono::Duration::days(6);
+        return (Some(start), Some(end));
+    }
+    if message.contains("이번달") {
+        let start = NaiveDate::from_ymd_opt(today.year(), today.month(), 1);
+        if let Some(start_date) = start {
+            let (next_year, next_month) = if today.month() == 12 {
+                (today.year() + 1, 1)
+            } else {
+                (today.year(), today.month() + 1)
+            };
+            let next_month_start = NaiveDate::from_ymd_opt(next_year, next_month, 1)
+                .unwrap_or(start_date);
+            let end = next_month_start - chrono::Duration::days(1);
+            return (Some(start_date), Some(end));
+        }
+    }
+    if message.contains("다음달") {
+        let (year, month) = if today.month() == 12 {
+            (today.year() + 1, 1)
+        } else {
+            (today.year(), today.month() + 1)
+        };
+        if let Some(start_date) = NaiveDate::from_ymd_opt(year, month, 1) {
+            let (next_year, next_month) = if month == 12 {
+                (year + 1, 1)
+            } else {
+                (year, month + 1)
+            };
+            let next_month_start = NaiveDate::from_ymd_opt(next_year, next_month, 1)
+                .unwrap_or(start_date);
+            let end = next_month_start - chrono::Duration::days(1);
+            return (Some(start_date), Some(end));
+        }
+    }
+    (None, None)
 }
 
 fn format_date_range(start: Option<NaiveDate>, end: Option<NaiveDate>) -> String {

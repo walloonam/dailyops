@@ -60,7 +60,7 @@ export default function Tasks() {
     { value: "high", label: "높음" }
   ];
 
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: ["tasks", q, status, priority, tag, sort, order, page],
     queryFn: () =>
       api<Task[]>(
@@ -175,6 +175,10 @@ export default function Tasks() {
           <div>이동</div>
         </div>
         <div className="grid gap-2">
+          {error && <div className="text-sm text-red-500">업무를 불러오지 못했습니다.</div>}
+          {!error && (data || []).length === 0 && (
+            <div className="text-sm text-slate-500">업무가 없습니다.</div>
+          )}
           {(data || []).map((t) => (
             <Link
               key={t.id}

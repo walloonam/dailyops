@@ -30,6 +30,7 @@ pub async fn create(
     let tags = payload.tags.unwrap_or_default();
     let start_date = payload.start_date.or(payload.due_date);
     let end_date = payload.end_date.or(payload.due_date);
+    let due_date = payload.due_date.or(end_date);
     let row = sqlx::query_as!(
         Task,
         r#"
@@ -43,7 +44,7 @@ pub async fn create(
         payload.description,
         payload.status,
         payload.priority,
-        payload.due_date,
+        due_date,
         start_date,
         end_date,
         &tags
@@ -149,6 +150,7 @@ pub async fn update(
 ) -> impl IntoResponse {
     let start_date = payload.start_date.or(payload.end_date);
     let end_date = payload.end_date.or(payload.start_date);
+    let due_date = payload.due_date.or(end_date);
     let row = sqlx::query_as!(
         Task,
         r#"
@@ -170,7 +172,7 @@ pub async fn update(
         payload.description,
         payload.status,
         payload.priority,
-        payload.due_date,
+        due_date,
         start_date,
         end_date,
         payload.tags.as_deref(),
