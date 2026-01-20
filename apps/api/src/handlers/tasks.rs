@@ -22,14 +22,54 @@ pub struct TaskListQuery {
     pub limit: Option<i64>,
 }
 
+fn is_valid_status(status: &str) -> bool {
+    matches!(status, "todo" | "in_progress" | "done")
+}
+
+fn is_valid_priority(priority: &str) -> bool {
+    matches!(priority, "low" | "medium" | "high")
+}
+
 pub async fn create(
     State(state): State<AppState>,
     AuthUser { user_id }: AuthUser,
     Json(payload): Json<TaskCreate>,
 ) -> impl IntoResponse {
+    let title = payload.title.trim();
+    if title.is_empty() {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "title required",
+        )
+            .into_response();
+    }
+    if !is_valid_status(&payload.status) {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "invalid status",
+        )
+            .into_response();
+    }
+    if !is_valid_priority(&payload.priority) {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "invalid priority",
+        )
+            .into_response();
+    }
+
     let tags = payload.tags.unwrap_or_default();
     let start_date = payload.start_date.or(payload.due_date);
     let end_date = payload.end_date.or(payload.due_date);
+    if let (Some(start), Some(end)) = (start_date, end_date) {
+        if start > end {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "start_date after end_date",
+            )
+                .into_response();
+        }
+    }
     let due_date = payload.due_date.or(end_date);
     let row = sqlx::query_as!(
         Task,
@@ -40,7 +80,7 @@ pub async fn create(
         "#,
         Uuid::new_v4(),
         user_id,
-        payload.title,
+        title,
         payload.description,
         payload.status,
         payload.priority,
@@ -64,7 +104,7 @@ pub async fn list(
     Query(query): Query<TaskListQuery>,
 ) -> impl IntoResponse {
     let page = query.page.unwrap_or(1).max(1);
-    let limit = query.limit.unwrap_or(20).max(1).min(100);
+    let limit = query.limit.unwrap_or(20).max(1).min(200);
     let offset = (page - 1) * limit;
 
     let sort = match query.sort.as_deref() {
@@ -148,8 +188,47 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(payload): Json<TaskUpdate>,
 ) -> impl IntoResponse {
+    if let Some(status) = payload.status.as_deref() {
+        if !is_valid_status(status) {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "invalid status",
+            )
+                .into_response();
+        }
+    }
+    if let Some(priority) = payload.priority.as_deref() {
+        if !is_valid_priority(priority) {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "invalid priority",
+            )
+                .into_response();
+        }
+    }
+
+    let title = payload.title.map(|t| t.trim().to_string());
+    if let Some(ref t) = title {
+        if t.is_empty() {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "title required",
+            )
+                .into_response();
+        }
+    }
+
     let start_date = payload.start_date.or(payload.end_date);
     let end_date = payload.end_date.or(payload.start_date);
+    if let (Some(start), Some(end)) = (start_date, end_date) {
+        if start > end {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "start_date after end_date",
+            )
+                .into_response();
+        }
+    }
     let due_date = payload.due_date.or(end_date);
     let row = sqlx::query_as!(
         Task,
@@ -168,7 +247,7 @@ pub async fn update(
         WHERE id = $9 AND user_id = $10
         RETURNING id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at
         "#,
-        payload.title,
+        title,
         payload.description,
         payload.status,
         payload.priority,

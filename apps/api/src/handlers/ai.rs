@@ -7,6 +7,8 @@ use uuid::Uuid;
 use crate::middleware::{AppState, AuthUser};
 use crate::models::{Note, Task};
 
+const MAX_CONTEXT_CHARS: usize = 4000;
+
 #[derive(Deserialize)]
 pub struct ChatRequest {
     pub message: String,
@@ -47,7 +49,7 @@ pub async fn chat(
     let tasks = fetch_tasks(&state, user_id).await.unwrap_or_default();
     let notes = fetch_notes(&state, user_id).await.unwrap_or_default();
 
-    let context = build_context(&tasks, &notes);
+    let context = truncate_context(&build_context(&tasks, &notes));
 
     let client = reqwest::Client::new();
     let url = format!("{}/api/chat", state.ai_base_url.trim_end_matches('/'));
@@ -381,4 +383,13 @@ fn build_context(tasks: &[Task], notes: &[Note]) -> String {
     } else {
         parts.join(" ; ")
     }
+}
+
+fn truncate_context(input: &str) -> String {
+    if input.chars().count() <= MAX_CONTEXT_CHARS {
+        return input.to_string();
+    }
+    let mut truncated: String = input.chars().take(MAX_CONTEXT_CHARS).collect();
+    truncated.push_str("...");
+    truncated
 }

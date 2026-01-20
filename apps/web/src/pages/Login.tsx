@@ -26,14 +26,19 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid place-items-center">
-      <form onSubmit={onSubmit} className="bg-white/90 p-8 rounded-2xl border border-slate-200/70 w-[360px] grid gap-3 shadow-sm">
+      <form
+        onSubmit={onSubmit}
+        className="bg-white/90 p-8 rounded-2xl border border-slate-200/70 w-[360px] grid gap-3 shadow-sm"
+      >
         <h1 className="text-2xl font-semibold">로그인</h1>
-        <div className="text-sm text-slate-500">오늘의 흐름을 이어가요.</div>
+        <div className="text-sm text-slate-500">데일리옵스에 오신 것을 환영합니다.</div>
         <input name="email" type="email" className="border p-2 rounded-xl" placeholder="이메일" />
         <input name="password" type="password" className="border p-2 rounded-xl" placeholder="비밀번호" />
         {error && <div className="text-red-500 text-sm">{error}</div>}
         <button className="bg-ink text-white rounded-xl py-2">로그인</button>
-        <Link to="/signup" className="text-sm text-slate-500">계정이 없나요?</Link>
+        <Link to="/signup" className="text-sm text-slate-500">
+          계정이 없나요? 회원가입
+        </Link>
       </form>
     </div>
   );

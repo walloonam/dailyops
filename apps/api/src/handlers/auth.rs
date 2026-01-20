@@ -9,6 +9,14 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(payload): Json<SignupPayload>,
 ) -> impl IntoResponse {
+    let email = payload.email.trim();
+    let password = payload.password.trim();
+    if email.is_empty() || password.is_empty() {
+        return (axum::http::StatusCode::BAD_REQUEST, "email/password required").into_response();
+    }
+    if password.len() < 6 {
+        return (axum::http::StatusCode::BAD_REQUEST, "password too short").into_response();
+    }
     let password_hash = match hash_password(&payload.password) {
         Ok(h) => h,
         Err(_) => return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "hash failed").into_response(),
@@ -43,6 +51,11 @@ pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginPayload>,
 ) -> impl IntoResponse {
+    let email = payload.email.trim();
+    let password = payload.password.trim();
+    if email.is_empty() || password.is_empty() {
+        return (axum::http::StatusCode::BAD_REQUEST, "email/password required").into_response();
+    }
     let row = sqlx::query!(
         "SELECT id, password_hash FROM users WHERE email = $1",
         payload.email

@@ -43,7 +43,7 @@ export default function NoteDetail() {
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <section className="card">
-        <h1 className="text-xl font-semibold mb-3">노트 수정</h1>
+        <h1 className="text-xl font-semibold mb-3">노트 상세</h1>
         <NoteForm
           initial={{
             title: data.title,

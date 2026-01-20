@@ -44,7 +44,7 @@ export default function Notes() {
       <div className="card flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">노트</h2>
-          <p className="text-sm text-slate-500">생성은 버튼 클릭 시 중앙 팝업으로 열립니다.</p>
+          <p className="text-sm text-slate-500">생성 버튼을 누르면 중앙 오버레이로 열립니다.</p>
         </div>
         <button className="btn-primary" onClick={() => setShowCreate(true)} type="button">
           새 노트 만들기

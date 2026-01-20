@@ -48,7 +48,7 @@ export default function Layout() {
         <header className="h-16 flex items-center justify-between px-6 border-b border-slate-200/60 bg-white/80 backdrop-blur sticky top-0">
           <div className="font-semibold text-lg">오늘의 일정</div>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span className="chip">온라인</span>
+            <span className="chip">알림</span>
             <div className="px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold">
               {getEmail() || "user@local"}
             </div>

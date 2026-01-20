@@ -60,7 +60,7 @@ export default function Dashboard() {
 
       <div className="grid md:grid-cols-2 gap-6">
         <section className="card">
-          <h2 className="text-lg font-semibold mb-3">오늘 해야 할 일</h2>
+          <h2 className="text-lg font-semibold mb-3">최근 업무</h2>
           <div className="grid gap-2">
             {(data?.recent_tasks || []).slice(0, 6).map((t) => (
               <div key={t.id} className="flex items-center justify-between border border-slate-200/70 rounded-xl p-2">

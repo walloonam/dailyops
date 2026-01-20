@@ -25,6 +25,23 @@ pub async fn create(
     AuthUser { user_id }: AuthUser,
     Json(payload): Json<NoteCreate>,
 ) -> impl IntoResponse {
+    let title = payload.title.trim();
+    if title.is_empty() {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "title required",
+        )
+            .into_response();
+    }
+    let content = payload.content.trim();
+    if content.is_empty() {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "content required",
+        )
+            .into_response();
+    }
+
     let tags = payload.tags.unwrap_or_default();
     let row = sqlx::query_as!(
         Note,
@@ -35,8 +52,8 @@ pub async fn create(
         "#,
         Uuid::new_v4(),
         user_id,
-        payload.title,
-        payload.content,
+        title,
+        content,
         &tags
     )
     .fetch_one(&state.pool)
@@ -127,6 +144,27 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(payload): Json<NoteUpdate>,
 ) -> impl IntoResponse {
+    let title = payload.title.map(|t| t.trim().to_string());
+    if let Some(ref t) = title {
+        if t.is_empty() {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "title required",
+            )
+                .into_response();
+        }
+    }
+    let content = payload.content.map(|c| c.trim().to_string());
+    if let Some(ref c) = content {
+        if c.is_empty() {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "content required",
+            )
+                .into_response();
+        }
+    }
+
     let row = sqlx::query_as!(
         Note,
         r#"
@@ -139,8 +177,8 @@ pub async fn update(
         WHERE id = $4 AND user_id = $5
         RETURNING *
         "#,
-        payload.title,
-        payload.content,
+        title,
+        content,
         payload.tags.as_deref(),
         id,
         user_id
