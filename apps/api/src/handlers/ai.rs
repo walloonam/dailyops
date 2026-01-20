@@ -1,4 +1,5 @@
 use axum::{extract::State, response::IntoResponse, Json};
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -32,6 +33,17 @@ pub async fn chat(
     AuthUser { user_id }: AuthUser,
     Json(payload): Json<ChatRequest>,
 ) -> impl IntoResponse {
+    if is_task_create_request(&payload.message) {
+        return handle_task_create(&state, user_id, &payload.message).await;
+    }
+
+    if !is_brief_request(&payload.message) {
+        return Json(ChatResponse {
+            reply: "I can only help with task registration and briefing. Try: \"업무 등록: 회의 준비 2024-12-01\" or \"오늘 일정 브리핑\".".to_string(),
+        })
+        .into_response();
+    }
+
     let tasks = fetch_tasks(&state, user_id).await.unwrap_or_default();
     let notes = fetch_notes(&state, user_id).await.unwrap_or_default();
 
@@ -83,6 +95,103 @@ pub async fn chat(
         )
             .into_response(),
     }
+}
+
+fn is_task_create_request(message: &str) -> bool {
+    let msg = message.to_lowercase();
+    msg.contains("업무등록")
+        || msg.contains("업무 등록")
+        || msg.contains("일정등록")
+        || msg.contains("일정 등록")
+        || msg.contains("add task")
+        || msg.starts_with("task:")
+}
+
+fn is_brief_request(message: &str) -> bool {
+    let msg = message.to_lowercase();
+    msg.contains("브리핑")
+        || msg.contains("요약")
+        || msg.contains("정리")
+        || msg.contains("우선순위")
+        || msg.contains("summary")
+        || msg.contains("brief")
+}
+
+async fn handle_task_create(
+    state: &AppState,
+    user_id: Uuid,
+    message: &str,
+) -> axum::response::Response {
+    let (title, due_date) = extract_title_and_due(message);
+    if title.is_empty() {
+        return Json(ChatResponse {
+            reply: "Please provide a task title. Example: \"업무 등록: 회의 준비 2024-12-01\".".to_string(),
+        })
+        .into_response();
+    }
+
+    let empty_tags: Vec<String> = Vec::new();
+    let row = sqlx::query_as!(
+        Task,
+        r#"
+        INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+        "#,
+        Uuid::new_v4(),
+        user_id,
+        title,
+        Option::<String>::None,
+        "todo",
+        "medium",
+        due_date,
+        &empty_tags
+    )
+    .fetch_one(&state.pool)
+    .await;
+
+    match row {
+        Ok(task) => Json(ChatResponse {
+            reply: format!(
+                "Task created: {}{}",
+                task.title,
+                task.due_date
+                    .map(|d| format!(" (due {})", d))
+                    .unwrap_or_default()
+            ),
+        })
+        .into_response(),
+        Err(_) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "db error").into_response(),
+    }
+}
+
+fn extract_title_and_due(message: &str) -> (String, Option<NaiveDate>) {
+    let mut due_date = None;
+    let mut filtered: Vec<String> = Vec::new();
+
+    for token in message.split_whitespace() {
+        if due_date.is_none() {
+            if let Ok(date) = NaiveDate::parse_from_str(token, "%Y-%m-%d") {
+                due_date = Some(date);
+                continue;
+            }
+        }
+        filtered.push(token.to_string());
+    }
+
+    let cleaned = filtered
+        .join(" ")
+        .replace("업무등록", "")
+        .replace("업무 등록", "")
+        .replace("일정등록", "")
+        .replace("일정 등록", "")
+        .replace("등록", "")
+        .replace("task:", "")
+        .replace("add task", "")
+        .trim()
+        .to_string();
+
+    (cleaned, due_date)
 }
 
 async fn fetch_tasks(state: &AppState, user_id: Uuid) -> Result<Vec<Task>, sqlx::Error> {

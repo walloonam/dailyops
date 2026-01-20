@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { getEmail } from "../lib/auth";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -12,15 +13,39 @@ type ChatResponse = {
 };
 
 const QUICK_PROMPTS = [
-  "오늘 일정 브리핑해줘",
-  "이번 주 우선순위 정리해줘",
-  "노트 요약해줘"
+  "Today briefing",
+  "This week priority summary",
+  "Summarize notes",
+  "업무 등록: 회의 준비 2024-12-01"
 ];
 
+const HISTORY_KEY = "dailyops_assistant_history";
+
+function loadHistory(): ChatMessage[] | null {
+  if (typeof window === "undefined") return null;
+  const email = getEmail() || "anon";
+  const raw = localStorage.getItem(`${HISTORY_KEY}:${email}`);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as ChatMessage[];
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export default function Assistant() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "안녕하세요. 궁금한 걸 물어보거나 오늘 일정 브리핑을 요청하세요." }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    return (
+      loadHistory() || [
+        {
+          role: "assistant",
+          content: "Ask a question, request a briefing, or register a task."
+        }
+      ]
+    );
+  });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +59,7 @@ export default function Assistant() {
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
     },
     onError: (err) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: `에러: ${String(err)}` }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${String(err)}` }]);
     }
   });
 
@@ -42,6 +67,12 @@ export default function Assistant() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }, [messages]);
+
+  useEffect(() => {
+    const email = getEmail() || "anon";
+    const trimmed = messages.slice(-50);
+    localStorage.setItem(`${HISTORY_KEY}:${email}`, JSON.stringify(trimmed));
   }, [messages]);
 
   const isSending = mutation.isPending;
@@ -57,8 +88,8 @@ export default function Assistant() {
   const placeholder = useMemo(
     () =>
       isSending
-        ? "답변 생성 중..."
-        : "예: 오늘 일정 브리핑해줘 / 이번 주 우선순위 정리",
+        ? "Generating..."
+        : "Try: Today briefing / 업무 등록: 회의 준비 2024-12-01",
     [isSending]
   );
 
@@ -66,8 +97,10 @@ export default function Assistant() {
     <div className="grid gap-6">
       <div className="card flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">AI 비서</h1>
-          <p className="text-sm text-slate-500">업무/노트 컨텍스트를 사용해 한국어로 요약·응답합니다.</p>
+          <h1 className="text-xl font-semibold">AI Assistant</h1>
+          <p className="text-sm text-slate-500">
+            Task registration and briefings based on your tasks and notes.
+          </p>
         </div>
         <div className="flex gap-2">
           {QUICK_PROMPTS.map((q) => (
@@ -90,7 +123,7 @@ export default function Assistant() {
                     : "bg-gradient-to-r from-indigo-500 to-cyan-400 text-white ml-auto max-w-[80%]"
                 }`}
               >
-                <div className="text-xs opacity-70 mb-1">{m.role === "assistant" ? "비서" : "나"}</div>
+                <div className="text-xs opacity-70 mb-1">{m.role === "assistant" ? "Assistant" : "Me"}</div>
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
               </div>
             ))}
@@ -111,7 +144,7 @@ export default function Assistant() {
             disabled={isSending}
           />
           <button className="btn-primary" onClick={() => sendMessage()} disabled={isSending} type="button">
-            보내기
+            Send
           </button>
         </div>
       </div>
