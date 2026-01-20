@@ -100,14 +100,26 @@ pub async fn chat(
 
 fn is_task_create_request(message: &str) -> bool {
     let msg = message.to_lowercase();
-    msg.contains("업무등록")
-        || msg.contains("업무 등록")
-        || msg.contains("일정등록")
-        || msg.contains("일정 등록")
-        || msg.contains("task")
-        || msg.contains("add task")
-        || msg.contains("create task")
-        || msg.starts_with("task:")
+    let has_create_verb = msg.contains("등록")
+        || msg.contains("추가")
+        || msg.contains("생성")
+        || msg.contains("만들");
+    let has_task_noun = msg.contains("업무") || msg.contains("일정") || msg.contains("task");
+    let mentions_note = msg.contains("노트") || msg.contains("메모");
+
+    if mentions_note && !has_task_noun {
+        return false;
+    }
+
+    has_create_verb
+        || (has_task_noun
+            && (msg.contains("업무등록")
+                || msg.contains("업무 등록")
+                || msg.contains("일정등록")
+                || msg.contains("일정 등록")
+                || msg.contains("add task")
+                || msg.contains("create task")
+                || msg.starts_with("task:")))
 }
 
 fn is_brief_request(message: &str) -> bool {
