@@ -161,7 +161,7 @@ pub async fn update(
         payload.status,
         payload.priority,
         payload.due_date,
-        payload.tags,
+        payload.tags.as_deref(),
         id,
         user_id
     )

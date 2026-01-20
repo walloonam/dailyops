@@ -141,7 +141,7 @@ pub async fn update(
         "#,
         payload.title,
         payload.content,
-        payload.tags,
+        payload.tags.as_deref(),
         id,
         user_id
     )

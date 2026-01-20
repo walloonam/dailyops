@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let cfg = config::Config::from_env()?;
     let pool = db::create_pool(&cfg.database_url).await?;
 
-    let app: Router = routes::app(pool, cfg)
+    let app: Router = routes::app(pool, cfg.clone())
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()

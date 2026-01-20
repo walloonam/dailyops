@@ -9,7 +9,7 @@ pub async fn summary(
     AuthUser { user_id }: AuthUser,
 ) -> impl IntoResponse {
     let today = Utc::now().date_naive();
-    let week_start = today - chrono::Duration::days(7);
+    let week_start = Utc::now() - chrono::Duration::days(7);
 
     let total_tasks = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM tasks WHERE user_id = $1",
@@ -17,6 +17,7 @@ pub async fn summary(
     )
     .fetch_one(&state.pool)
     .await
+    .unwrap_or(Some(0))
     .unwrap_or(0);
 
     let due_today = sqlx::query_scalar!(
@@ -26,6 +27,7 @@ pub async fn summary(
     )
     .fetch_one(&state.pool)
     .await
+    .unwrap_or(Some(0))
     .unwrap_or(0);
 
     let overdue = sqlx::query_scalar!(
@@ -35,6 +37,7 @@ pub async fn summary(
     )
     .fetch_one(&state.pool)
     .await
+    .unwrap_or(Some(0))
     .unwrap_or(0);
 
     let done_this_week = sqlx::query_scalar!(
@@ -44,6 +47,7 @@ pub async fn summary(
     )
     .fetch_one(&state.pool)
     .await
+    .unwrap_or(Some(0))
     .unwrap_or(0);
 
     let recent_tasks = sqlx::query_as!(

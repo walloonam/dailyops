@@ -12,13 +12,14 @@ pub struct Claims {
 pub fn hash_password(password: &str) -> anyhow::Result<String> {
     let salt = SaltString::generate(&mut rand::thread_rng());
     let hash = Argon2::default()
-        .hash_password(password.as_bytes(), &salt)?
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|err| anyhow::anyhow!(err))?
         .to_string();
     Ok(hash)
 }
 
 pub fn verify_password(password: &str, hash: &str) -> anyhow::Result<bool> {
-    let parsed = PasswordHash::new(hash)?;
+    let parsed = PasswordHash::new(hash).map_err(|err| anyhow::anyhow!(err))?;
     Ok(Argon2::default()
         .verify_password(password.as_bytes(), &parsed)
         .is_ok())
