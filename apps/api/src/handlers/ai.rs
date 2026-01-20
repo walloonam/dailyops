@@ -124,7 +124,7 @@ async fn handle_task_create(
     user_id: Uuid,
     message: &str,
 ) -> axum::response::Response {
-    let (title, due_date) = extract_title_and_due(message);
+    let (title, start_date, end_date) = extract_title_and_range(message);
     if title.is_empty() {
         return Json(ChatResponse {
             reply: "업무 제목을 알려주세요. 예) \"업무 등록: 회의 준비 2024-12-01\"".to_string(),
@@ -136,9 +136,9 @@ async fn handle_task_create(
     let row = sqlx::query_as!(
         Task,
         r#"
-        INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, tags)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
+        INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, start_date, end_date, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at
         "#,
         Uuid::new_v4(),
         user_id,
@@ -146,7 +146,9 @@ async fn handle_task_create(
         Option::<String>::None,
         "todo",
         "medium",
-        due_date,
+        end_date,
+        start_date,
+        end_date,
         &empty_tags
     )
     .fetch_one(&state.pool)
@@ -157,9 +159,7 @@ async fn handle_task_create(
             reply: format!(
                 "업무가 등록됐어요: {}{}",
                 task.title,
-                task.due_date
-                    .map(|d| format!(" (마감 {})", d))
-                    .unwrap_or_default()
+                format_date_range(task.start_date, task.end_date)
             ),
         })
         .into_response(),
@@ -167,18 +167,45 @@ async fn handle_task_create(
     }
 }
 
-fn extract_title_and_due(message: &str) -> (String, Option<NaiveDate>) {
-    let mut due_date = None;
+fn extract_title_and_range(message: &str) -> (String, Option<NaiveDate>, Option<NaiveDate>) {
+    let mut start_date = None;
+    let mut end_date = None;
     let mut filtered: Vec<String> = Vec::new();
 
     for token in message.split_whitespace() {
-        if due_date.is_none() {
-            if let Ok(date) = NaiveDate::parse_from_str(token, "%Y-%m-%d") {
-                due_date = Some(date);
+        let token_trim = token.trim();
+        if token_trim.contains('~') {
+            let parts: Vec<&str> = token_trim.split('~').collect();
+            if parts.len() == 2 {
+                if let Ok(date) = NaiveDate::parse_from_str(parts[0], "%Y-%m-%d") {
+                    start_date = Some(date);
+                }
+                if let Ok(date) = NaiveDate::parse_from_str(parts[1], "%Y-%m-%d") {
+                    end_date = Some(date);
+                }
+                continue;
+            }
+        }
+
+        if start_date.is_none() {
+            if let Ok(date) = NaiveDate::parse_from_str(token_trim, "%Y-%m-%d") {
+                start_date = Some(date);
+                continue;
+            }
+        } else if end_date.is_none() {
+            if let Ok(date) = NaiveDate::parse_from_str(token_trim, "%Y-%m-%d") {
+                end_date = Some(date);
                 continue;
             }
         }
         filtered.push(token.to_string());
+    }
+
+    if start_date.is_some() && end_date.is_none() {
+        end_date = start_date;
+    }
+    if end_date.is_some() && start_date.is_none() {
+        start_date = end_date;
     }
 
     let cleaned = filtered
@@ -194,15 +221,24 @@ fn extract_title_and_due(message: &str) -> (String, Option<NaiveDate>) {
         .trim()
         .to_string();
 
-    (cleaned, due_date)
+    (cleaned, start_date, end_date)
+}
+
+fn format_date_range(start: Option<NaiveDate>, end: Option<NaiveDate>) -> String {
+    match (start, end) {
+        (Some(s), Some(e)) if s == e => format!(" (마감 {})", s),
+        (Some(s), Some(e)) => format!(" ({} ~ {})", s, e),
+        (Some(s), None) => format!(" (마감 {})", s),
+        _ => "".to_string(),
+    }
 }
 
 async fn fetch_tasks(state: &AppState, user_id: Uuid) -> Result<Vec<Task>, sqlx::Error> {
     sqlx::query_as!(
         Task,
-        r#"SELECT * FROM tasks
+        r#"SELECT id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at FROM tasks
            WHERE user_id = $1
-           ORDER BY due_date NULLS LAST, updated_at DESC
+           ORDER BY end_date NULLS LAST, updated_at DESC
            LIMIT 30"#,
         user_id
     )
@@ -231,10 +267,12 @@ fn build_context(tasks: &[Task], notes: &[Note]) -> String {
             .map(|t| {
                 let status = &t.status;
                 let prio = &t.priority;
-                let due = t
-                    .due_date
-                    .map(|d| d.to_string())
-                    .unwrap_or_else(|| "마감 없음".to_string());
+                let due = match (t.start_date, t.end_date) {
+                    (Some(s), Some(e)) if s == e => format!("마감 {}", s),
+                    (Some(s), Some(e)) => format!("{}~{}", s, e),
+                    (Some(s), None) => format!("마감 {}", s),
+                    _ => "마감 없음".to_string(),
+                };
                 let tags = if t.tags.is_empty() {
                     "".to_string()
                 } else {

@@ -1,4 +1,4 @@
-type TaskStatus = "todo" | "in_progress" | "done";
+﻿type TaskStatus = "todo" | "in_progress" | "done";
 type TaskPriority = "low" | "medium" | "high";
 
 export type Task = {
@@ -7,7 +7,8 @@ export type Task = {
   description?: string | null;
   status: TaskStatus;
   priority: TaskPriority;
-  due_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -33,6 +34,9 @@ const makeId = () => {
   return `mock-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+const today = new Date().toISOString().slice(0, 10);
+const twoDaysLater = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+
 const tasks: Task[] = [
   {
     id: "t-1",
@@ -40,7 +44,8 @@ const tasks: Task[] = [
     description: "Sort quick wins and block tasks",
     status: "todo",
     priority: "medium",
-    due_date: new Date().toISOString().slice(0, 10),
+    start_date: today,
+    end_date: today,
     tags: ["inbox", "ops"],
     created_at: nowIso(),
     updated_at: nowIso()
@@ -51,7 +56,8 @@ const tasks: Task[] = [
     description: "Review outcomes and plan next steps",
     status: "in_progress",
     priority: "high",
-    due_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
+    start_date: today,
+    end_date: twoDaysLater,
     tags: ["planning"],
     created_at: nowIso(),
     updated_at: nowIso()
@@ -62,7 +68,8 @@ const tasks: Task[] = [
     description: "Clean up KPI layout and spacing",
     status: "done",
     priority: "low",
-    due_date: null,
+    start_date: null,
+    end_date: null,
     tags: ["ui"],
     created_at: nowIso(),
     updated_at: nowIso()
@@ -118,8 +125,8 @@ export function listTasks(params: URLSearchParams) {
   }
 
   result.sort((a, b) => {
-    const aVal = sort === "due_date" ? a.due_date || "" : a.created_at;
-    const bVal = sort === "due_date" ? b.due_date || "" : b.created_at;
+    const aVal = sort === "end_date" ? a.end_date || "" : a.created_at;
+    const bVal = sort === "end_date" ? b.end_date || "" : b.created_at;
     if (aVal === bVal) return 0;
     const cmp = aVal > bVal ? 1 : -1;
     return order === "asc" ? cmp : -cmp;
@@ -140,7 +147,8 @@ export function createTask(input: Partial<Task>) {
     description: input.description || null,
     status: (input.status as TaskStatus) || "todo",
     priority: (input.priority as TaskPriority) || "medium",
-    due_date: input.due_date || null,
+    start_date: input.start_date || input.end_date || null,
+    end_date: input.end_date || input.start_date || null,
     tags: input.tags || [],
     created_at: nowIso(),
     updated_at: nowIso()
@@ -199,12 +207,21 @@ export function deleteNote(id: string) {
 }
 
 export function summary() {
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
 
   const total_tasks = tasks.length;
-  const due_today = tasks.filter((t) => t.due_date === today).length;
-  const overdue = tasks.filter((t) => t.due_date && t.due_date < today && t.status !== "done").length;
+  const due_today = tasks.filter((t) => {
+    const start = t.start_date || t.end_date;
+    const end = t.end_date || t.start_date;
+    if (!start || !end) return false;
+    return start <= todayStr && end >= todayStr;
+  }).length;
+  const overdue = tasks.filter((t) => {
+    if (t.status === "done") return false;
+    const end = t.end_date || t.start_date;
+    return end ? end < todayStr : false;
+  }).length;
   const done_this_week = tasks.filter((t) => {
     if (t.status !== "done") return false;
     return new Date(t.updated_at) >= sevenDaysAgo;
@@ -216,8 +233,13 @@ export function summary() {
 }
 
 export function aiReply(input: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  const dueToday = tasks.filter((t) => t.due_date === today);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dueToday = tasks.filter((t) => {
+    const start = t.start_date || t.end_date;
+    const end = t.end_date || t.start_date;
+    if (!start || !end) return false;
+    return start <= todayStr && end >= todayStr;
+  });
   const topPriorities = tasks
     .filter((t) => t.status !== "done")
     .sort((a, b) => {
@@ -230,12 +252,12 @@ export function aiReply(input: string) {
 
   const lines = [];
   lines.push(`질문: ${input}`);
-  lines.push(`오늘(${today}) 할 일: ${dueToday.length}개`);
+  lines.push(`오늘(${todayStr}) 일정 ${dueToday.length}건`);
   dueToday.forEach((t) => lines.push(`- ${t.title} (${t.priority})`));
   lines.push(`우선순위 Top3: ${topPriorities.map((t) => `${t.title}(${t.priority})`).join(", ")}`);
   if (noteTitles.length) {
     lines.push(`최근 노트: ${noteTitles.join(", ")}`);
   }
-  lines.push("모델 대신 목업 응답입니다.");
+  lines.push("모델 응답을 모킹했습니다.");
   return lines.join("\n");
 }

@@ -21,7 +21,7 @@ pub async fn summary(
     .unwrap_or(0);
 
     let due_today = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND due_date = $2",
+        "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND COALESCE(start_date, due_date) <= $2 AND COALESCE(end_date, due_date) >= $2",
         user_id,
         today
     )
@@ -31,7 +31,7 @@ pub async fn summary(
     .unwrap_or(0);
 
     let overdue = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND due_date < $2 AND status != 'done'",
+        "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND COALESCE(end_date, due_date) < $2 AND status != 'done'",
         user_id,
         today
     )
@@ -52,7 +52,7 @@ pub async fn summary(
 
     let recent_tasks = sqlx::query_as!(
         Task,
-        "SELECT * FROM tasks WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 10",
+        "SELECT id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at FROM tasks WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 10",
         user_id
     )
     .fetch_all(&state.pool)

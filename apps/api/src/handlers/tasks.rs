@@ -28,12 +28,14 @@ pub async fn create(
     Json(payload): Json<TaskCreate>,
 ) -> impl IntoResponse {
     let tags = payload.tags.unwrap_or_default();
+    let start_date = payload.start_date.or(payload.due_date);
+    let end_date = payload.end_date.or(payload.due_date);
     let row = sqlx::query_as!(
         Task,
         r#"
-        INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, tags)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
+        INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, start_date, end_date, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at
         "#,
         Uuid::new_v4(),
         user_id,
@@ -42,6 +44,8 @@ pub async fn create(
         payload.status,
         payload.priority,
         payload.due_date,
+        start_date,
+        end_date,
         &tags
     )
     .fetch_one(&state.pool)
@@ -63,7 +67,7 @@ pub async fn list(
     let offset = (page - 1) * limit;
 
     let sort = match query.sort.as_deref() {
-        Some("due_date") => "due_date",
+        Some("end_date") => "COALESCE(end_date, due_date)",
         Some("created_at") => "created_at",
         _ => "created_at",
     };
@@ -72,7 +76,9 @@ pub async fn list(
         _ => "DESC",
     };
 
-    let mut qb = QueryBuilder::new("SELECT * FROM tasks WHERE user_id = ");
+    let mut qb = QueryBuilder::new(
+        "SELECT id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at FROM tasks WHERE user_id = ",
+    );
     qb.push_bind(user_id);
 
     if let Some(q) = query.q {
@@ -121,7 +127,7 @@ pub async fn get(
 ) -> impl IntoResponse {
     let row = sqlx::query_as!(
         Task,
-        "SELECT * FROM tasks WHERE id = $1 AND user_id = $2",
+        "SELECT id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at FROM tasks WHERE id = $1 AND user_id = $2",
         id,
         user_id
     )
@@ -141,6 +147,8 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(payload): Json<TaskUpdate>,
 ) -> impl IntoResponse {
+    let start_date = payload.start_date.or(payload.end_date);
+    let end_date = payload.end_date.or(payload.start_date);
     let row = sqlx::query_as!(
         Task,
         r#"
@@ -151,16 +159,20 @@ pub async fn update(
             status = COALESCE($3, status),
             priority = COALESCE($4, priority),
             due_date = COALESCE($5, due_date),
-            tags = COALESCE($6, tags),
+            start_date = COALESCE($6, start_date),
+            end_date = COALESCE($7, end_date),
+            tags = COALESCE($8, tags),
             updated_at = NOW()
-        WHERE id = $7 AND user_id = $8
-        RETURNING *
+        WHERE id = $9 AND user_id = $10
+        RETURNING id, user_id, title, description, status, priority, due_date, start_date, end_date, tags, created_at, updated_at
         "#,
         payload.title,
         payload.description,
         payload.status,
         payload.priority,
         payload.due_date,
+        start_date,
+        end_date,
         payload.tags.as_deref(),
         id,
         user_id

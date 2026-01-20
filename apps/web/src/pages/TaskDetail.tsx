@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+﻿import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import TaskForm, { TaskFormValues } from "../components/TaskForm";
@@ -9,7 +9,8 @@ type Task = {
   description?: string | null;
   status: string;
   priority: string;
-  due_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   tags: string[];
 };
 
@@ -24,6 +25,14 @@ const priorityLabel: Record<string, string> = {
   medium: "보통",
   high: "높음"
 };
+
+function formatRange(start?: string | null, end?: string | null) {
+  if (start && end) {
+    if (start === end) return start;
+    return `${start} ~ ${end}`;
+  }
+  return start || end || "마감 없음";
+}
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -41,7 +50,8 @@ export default function TaskDetail() {
         method: "PATCH",
         body: JSON.stringify({
           ...payload,
-          due_date: payload.due_date || null,
+          start_date: payload.start_date || payload.end_date || null,
+          end_date: payload.end_date || payload.start_date || null,
           tags: payload.tags ? payload.tags.split(",").map((t) => t.trim()) : []
         })
       }),
@@ -58,14 +68,15 @@ export default function TaskDetail() {
   return (
     <div className="grid gap-6">
       <div className="card">
-        <h1 className="text-xl font-semibold mb-3">업무 수정</h1>
+        <h1 className="text-xl font-semibold mb-3">업무 상세</h1>
         <TaskForm
           initial={{
             title: data.title,
             description: data.description || "",
             status: data.status as any,
             priority: data.priority as any,
-            due_date: data.due_date || "",
+            start_date: data.start_date || "",
+            end_date: data.end_date || "",
             tags: data.tags.join(", ")
           }}
           onSubmit={(v) => update.mutate(v)}
@@ -73,7 +84,7 @@ export default function TaskDetail() {
         <div className="flex flex-wrap gap-2 mt-3">
           <span className="chip chip-muted">{statusLabel[data.status] || data.status}</span>
           <span className="chip chip-muted">{priorityLabel[data.priority] || data.priority}</span>
-          <span className="chip chip-muted">{data.due_date || "마감 없음"}</span>
+          <span className="chip chip-muted">{formatRange(data.start_date, data.end_date)}</span>
         </div>
         <button className="mt-4 text-red-600" onClick={() => del.mutate()}>
           삭제

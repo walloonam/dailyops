@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+﻿import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 const schema = z.object({
@@ -6,7 +6,8 @@ const schema = z.object({
   description: z.string().optional(),
   status: z.enum(["todo", "in_progress", "done"]),
   priority: z.enum(["low", "medium", "high"]),
-  due_date: z.string().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
   tags: z.string().optional()
 });
 
@@ -43,8 +44,11 @@ export default function TaskForm({
           <option value="high">높음</option>
         </select>
       </div>
-      <input className="border p-2 rounded-xl" type="date" {...register("due_date")} />
-      <input className="border p-2 rounded-xl" placeholder="태그 (쉼표로 구분)" {...register("tags")} />
+      <div className="grid grid-cols-2 gap-2">
+        <input className="border p-2 rounded-xl" type="date" {...register("start_date")} />
+        <input className="border p-2 rounded-xl" type="date" {...register("end_date")} />
+      </div>
+      <input className="border p-2 rounded-xl" placeholder="태그 (쉼표 구분)" {...register("tags")} />
       <button className="btn-primary justify-center" type="submit">
         저장
       </button>

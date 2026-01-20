@@ -19,6 +19,8 @@ pub struct Task {
     pub status: String,
     pub priority: String,
     pub due_date: Option<NaiveDate>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -59,6 +61,8 @@ pub struct TaskCreate {
     pub status: String,
     pub priority: String,
     pub due_date: Option<NaiveDate>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -69,6 +73,8 @@ pub struct TaskUpdate {
     pub status: Option<String>,
     pub priority: Option<String>,
     pub due_date: Option<NaiveDate>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
     pub tags: Option<Vec<String>>,
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -10,7 +10,8 @@ type Task = {
   title: string;
   status: string;
   priority: string;
-  due_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   tags?: string[];
 };
 
@@ -25,6 +26,14 @@ const priorityLabel: Record<string, string> = {
   medium: "보통",
   high: "높음"
 };
+
+function formatRange(start?: string | null, end?: string | null) {
+  if (start && end) {
+    if (start === end) return start;
+    return `${start} ~ ${end}`;
+  }
+  return start || end || "-";
+}
 
 export default function Tasks() {
   const qc = useQueryClient();
@@ -67,7 +76,8 @@ export default function Tasks() {
         method: "POST",
         body: JSON.stringify({
           ...payload,
-          due_date: payload.due_date || null,
+          start_date: payload.start_date || payload.end_date || null,
+          end_date: payload.end_date || payload.start_date || null,
           tags: payload.tags ? payload.tags.split(",").map((t) => t.trim()) : []
         })
       }),
@@ -102,7 +112,7 @@ export default function Tasks() {
               onChange={(e) => setTag(e.target.value)}
             />
             <button className="btn-primary" onClick={() => setShowCreate(true)} type="button">
-              새 업무 만들기
+              + 업무 만들기
             </button>
           </div>
         </div>
@@ -141,7 +151,7 @@ export default function Tasks() {
         <div className="flex gap-2 flex-wrap">
           <select className="border p-2 rounded-xl" value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="created_at">정렬: 생성일</option>
-            <option value="due_date">정렬: 마감일</option>
+            <option value="end_date">정렬: 기간</option>
           </select>
           <select className="border p-2 rounded-xl" value={order} onChange={(e) => setOrder(e.target.value)}>
             <option value="desc">순서: 최신</option>
@@ -154,14 +164,14 @@ export default function Tasks() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">업무 목록</h2>
           <button className="text-sm text-slate-500 hover:text-slate-800" onClick={() => setShowCreate(true)} type="button">
-            + 새 업무
+            + 업무
           </button>
         </div>
         <div className="hidden md:grid grid-cols-5 gap-2 text-xs text-slate-400 pb-2">
           <div>제목</div>
           <div>상태</div>
           <div>우선순위</div>
-          <div>마감일</div>
+          <div>기간</div>
           <div>이동</div>
         </div>
         <div className="grid gap-2">
@@ -179,11 +189,11 @@ export default function Tasks() {
                 <div className="text-sm text-slate-500">
                   <span className="chip chip-muted">{priorityLabel[t.priority] || t.priority}</span>
                 </div>
-                <div className="text-sm text-slate-500">{t.due_date || "-"}</div>
+                <div className="text-sm text-slate-500">{formatRange(t.start_date, t.end_date)}</div>
                 <div className="text-sm text-slate-500 md:text-right">상세 보기</div>
               </div>
               <div className="md:hidden flex gap-2 mt-2 text-xs text-slate-500">
-                <span className="chip chip-muted">{t.due_date || "마감 없음"}</span>
+                <span className="chip chip-muted">{formatRange(t.start_date, t.end_date)}</span>
                 {t.tags?.slice(0, 2).map((tg) => (
                   <span key={tg} className="chip chip-muted">
                     #{tg}
